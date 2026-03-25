@@ -1,0 +1,104 @@
+# configs/datasets.yaml
+# PVAD Data Generation — Master Configuration
+# This is the single source of truth for all datasets and pipeline settings.
+
+datasets:
+
+  librispeech_clean100:
+    name: "LibriSpeech train-clean-100"
+    path: "librispeech"
+    language: "en"
+    audio_root: /data/LibriSpeech
+    has_alignments: true
+    alignment_path: /data/LibriSpeech_Alignments
+    manifest: /data/manifests/librispeech_clean100.json
+    splits: ["train-clean-100"]
+    num_speakers_in_corpus: 251
+    ctc_model: null
+
+  librispeech_clean360:
+    name: "LibriSpeech train-clean-360"
+    path: "librispeech_360"
+    language: "en"
+    audio_root: /data/LibriSpeech
+    has_alignments: true
+    alignment_path: /data/LibriSpeech_Alignments
+    manifest: /data/manifests/librispeech_clean360.json
+    splits: ["train-clean-360"]
+    num_speakers_in_corpus: 921
+    ctc_model: null
+
+  my_hindi_dataset:
+    name: "Hindi Conversational Speech"
+    path: "hindi_conv"
+    language: "hi"
+    audio_root: /data/hindi_speech
+    has_alignments: false
+    metadata_file: /data/hindi_speech/metadata.csv
+    metadata_format: "csv"
+    manifest: /data/manifests/hindi_conv.json
+    num_speakers_in_corpus: 150
+    ctc_model: "stt_hi_conformer_ctc_medium"
+
+  my_spanish_dataset:
+    name: "Spanish Read Speech"
+    path: "spanish_read"
+    language: "es"
+    audio_root: /data/spanish_speech
+    has_alignments: false
+    metadata_file: /data/spanish_speech/metadata.json
+    metadata_format: "json"
+    manifest: /data/manifests/spanish_read.json
+    num_speakers_in_corpus: 80
+    ctc_model: "stt_es_conformer_ctc_large"
+
+  my_english_custom:
+    name: "English Internal Dataset"
+    path: "en_internal"
+    language: "en"
+    audio_root: /data/en_internal
+    has_alignments: false
+    metadata_file: /data/en_internal/metadata.csv
+    metadata_format: "csv"
+    manifest: /data/manifests/en_internal.json
+    num_speakers_in_corpus: 200
+    ctc_model: "stt_en_conformer_ctc_large"
+
+  # ── Add more datasets by copying the block above ──
+  # my_new_dataset:
+  #   name: "..."
+  #   path: "..."
+  #   ...
+
+
+# ─── Simulation Settings (shared across all datasets) ───
+
+simulation:
+  speaker_counts: [1, 2, 3]
+
+  sessions_per_count:
+    train: 1000
+    val: 200
+    test: 100
+
+  session_length: 120  # seconds
+
+  # ── Gap / Silence Control ──
+  turn_gap:
+    mean: 0.6
+    variance: 0.1
+    min: 0.2
+    max: 1.5
+
+  # ── DISABLED — No overlap, no augmentation ──
+  overlap: 0.0
+  add_noise: false
+  add_rir: false
+
+# ─── NFA + VAD Refinement Settings ───
+
+alignment:
+  silero_vad_threshold: 0.5
+  silero_window_ms: 32
+  min_word_duration: 0.02
+  nfa_batch_size: 16

@@ -1,0 +1,61 @@
+# configs/data_simulator.yaml
+# NeMo Multi-Speaker Simulator Config — No Augmentation, No Overlap
+
+data_simulator:
+  manifest_filepath: ???                     # Override per run
+  sr: 16000
+  random_seed: 42
+
+  session_config:
+    num_sessions: ???                        # Override per run
+    session_length: 120
+
+  session_params:
+    num_speakers: ???                        # Override: 1, 2, or 3
+
+    # ── Turn gaps (controlled silence between speakers) ──
+    mean_silence: 0.6
+    mean_silence_var: 0.1
+    per_silence_min: 0.2
+    per_silence_max: 1.5
+    per_silence_var: 900.0
+
+    # ── ZERO overlap ──
+    mean_overlap: 0.0
+    mean_overlap_var: 0.0
+    per_overlap_min: 0.0
+    per_overlap_max: 0.0
+    per_overlap_var: 0.0
+
+    # ── Speaker behavior ──
+    speaker_enforcement: True
+    mean_dominance: 0.5
+    mean_dominance_var: 0.1
+
+    # ── Utterance construction ──
+    mean_sentence_length_in_words: 10
+    sentence_length_var: 5.0
+    start_window: True
+
+  outputs:
+    output_dir: ???
+    output_filename: multispeaker_session
+    overwrite: True
+    save_wav: True
+    save_rttm: True
+    save_json: True
+    save_ctm: False
+    save_list: True
+
+  # ── ALL AUGMENTATION DISABLED ──
+  background_noise:
+    add_bg: False
+
+  session_augmentor:
+    add_sess_aug: False
+
+  speaker:
+    enforce_num_speakers: True
+    turn_prob: 0.5
+    min_turn_length: 0.5
+    max_turn_length: 20.0
