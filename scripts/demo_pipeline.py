@@ -388,10 +388,39 @@ Examples:
                         help="Target session duration in seconds")
     parser.add_argument("--sr", type=int, default=16000,
                         help="Sample rate")
-    parser.add_argument("--turn_gap_mean", type=float, default=0.6)
-    parser.add_argument("--turn_gap_min", type=float, default=0.2)
-    parser.add_argument("--turn_gap_max", type=float, default=1.5)
+    parser.add_argument("--config", type=str, default=None,
+                        help="Path to datasets.yaml — reads turn_gap and session_length from it")
+    parser.add_argument("--turn_gap_mean", type=float, default=None)
+    parser.add_argument("--turn_gap_min", type=float, default=None)
+    parser.add_argument("--turn_gap_max", type=float, default=None)
     args = parser.parse_args()
+
+    # ── Load defaults from config if provided ──
+    if args.config and os.path.isfile(args.config):
+        import yaml
+        with open(args.config) as f:
+            cfg = yaml.safe_load(f)
+        sim = cfg.get("simulation", {})
+        tg = sim.get("turn_gap", {})
+        if args.turn_gap_mean is None:
+            args.turn_gap_mean = tg.get("mean", 0.6)
+        if args.turn_gap_min is None:
+            args.turn_gap_min = tg.get("min", 0.2)
+        if args.turn_gap_max is None:
+            args.turn_gap_max = tg.get("max", 1.5)
+        if args.session_duration == 30.0:  # only override if user didn't set it
+            args.session_duration = sim.get("session_length", 30.0)
+        print(f"  Loaded config from {args.config}")
+    else:
+        if args.turn_gap_mean is None:
+            args.turn_gap_mean = 0.6
+        if args.turn_gap_min is None:
+            args.turn_gap_min = 0.2
+        if args.turn_gap_max is None:
+            args.turn_gap_max = 1.5
+
+    print(f"  Turn gap: mean={args.turn_gap_mean}, min={args.turn_gap_min}, max={args.turn_gap_max}")
+    print(f"  Session duration: {args.session_duration}s")
 
     random.seed(42)
     np.random.seed(42)
