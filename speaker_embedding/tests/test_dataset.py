@@ -1,9 +1,8 @@
 """Tests for manifest loading and SpeakerDataset."""
 
 import json
+from unittest.mock import patch
 
-import numpy as np
-import soundfile as sf
 import torch
 import pytest
 from omegaconf import OmegaConf
@@ -23,10 +22,11 @@ def _write_manifest(path, entries):
             fh.write(json.dumps(entry) + "\n")
 
 
-def _make_wav(path, num_samples=16000, sample_rate=16000):
-    """Create a mono WAV file with random noise."""
-    data = np.random.randn(num_samples).astype(np.float32)
-    sf.write(str(path), data, sample_rate)
+def _mock_torchaudio_load(filepath):
+    """Return a fake waveform tensor of 2 seconds at 16 kHz."""
+    sample_rate = 16000
+    waveform = torch.randn(1, sample_rate * 2)
+    return waveform, sample_rate
 
 
 # ---------------------------------------------------------------------------
@@ -114,18 +114,15 @@ class TestSpeakerDataset:
 
     @pytest.fixture
     def dataset_with_audio(self, tmp_path):
-        """Create a dataset backed by real WAV files."""
+        """Create a dataset with mocked audio loading."""
         sample_rate = 16000
         segment_length = 1.0  # 1 second
         entries = []
         for i in range(4):
-            wav_path = tmp_path / f"utt{i}.wav"
-            dur = 2.0  # 2 seconds of audio
-            _make_wav(wav_path, num_samples=int(dur * sample_rate), sample_rate=sample_rate)
             entries.append(ManifestEntry(
-                audio_filepath=str(wav_path),
+                audio_filepath=f"/fake/utt{i}.wav",
                 speaker=f"spk{i % 2}",
-                duration=dur,
+                duration=2.0,
                 gender="m" if i % 2 == 0 else "f",
             ))
         config = OmegaConf.create({
@@ -137,18 +134,21 @@ class TestSpeakerDataset:
     def test_len(self, dataset_with_audio):
         assert len(dataset_with_audio) == 4
 
-    def test_getitem_keys(self, dataset_with_audio):
+    @patch("speaker_embedding.src.data.dataset.torchaudio.load", side_effect=_mock_torchaudio_load)
+    def test_getitem_keys(self, mock_load, dataset_with_audio):
         sample = dataset_with_audio[0]
         assert "audio" in sample
         assert "speaker_id" in sample
         assert "gender" in sample
         assert "index" in sample
 
-    def test_getitem_audio_shape(self, dataset_with_audio):
+    @patch("speaker_embedding.src.data.dataset.torchaudio.load", side_effect=_mock_torchaudio_load)
+    def test_getitem_audio_shape(self, mock_load, dataset_with_audio):
         sample = dataset_with_audio[0]
         expected_samples = int(1.0 * 16000)  # segment_length * sample_rate
         assert sample["audio"].shape == (1, expected_samples)
 
-    def test_speaker_id_is_int(self, dataset_with_audio):
+    @patch("speaker_embedding.src.data.dataset.torchaudio.load", side_effect=_mock_torchaudio_load)
+    def test_speaker_id_is_int(self, mock_load, dataset_with_audio):
         sample = dataset_with_audio[0]
         assert isinstance(sample["speaker_id"], int)
