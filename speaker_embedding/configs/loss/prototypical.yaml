@@ -1,0 +1,6 @@
+# Prototypical network loss configuration
+loss:
+  type: "proto"
+  distance: "cosine"        # cosine | euclidean
+  n_support: 1
+  temperature: 0.05

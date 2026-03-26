@@ -1,0 +1,8 @@
+# AAM-Softmax loss configuration
+loss:
+  type: "aam"
+  num_classes: ???  # set from manifest
+  embedding_dim: ${model.embedding_dim}
+  margin: 0.2
+  scale: 30.0
+  easy_margin: false

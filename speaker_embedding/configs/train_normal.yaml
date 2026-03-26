@@ -1,0 +1,10 @@
+# Normal training configuration
+defaults:
+  - base
+  - model: ecapa_tdnn
+  - loss: aam_softmax
+  - _self_
+
+training:
+  mode: "normal"
+  epochs: 100

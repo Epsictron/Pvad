@@ -1,0 +1,5 @@
+# Custom model configuration placeholder
+# Replace with your own model parameters
+model:
+  name: "custom"
+  embedding_dim: 256

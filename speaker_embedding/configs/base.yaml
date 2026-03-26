@@ -1,0 +1,115 @@
+# Base configuration for speaker embedding training
+# All defaults live here; model/loss/training configs override selectively.
+
+seed: 42
+
+data:
+  manifest_path: ???  # required
+  val_manifest_path: null
+  min_duration: 1.0       # seconds
+  max_duration: 30.0
+  num_workers: 4
+  pin_memory: true
+  segment_length: 3.0     # seconds, crop/pad to this
+  utterances_per_speaker: 2
+  unknown_gender_strategy: "proportional"  # proportional | male | female | exclude
+
+features:
+  type: "fbank"            # fbank | mfcc | spectrogram | raw
+  sample_rate: 16000
+  n_fft: 512
+  win_length: 400          # 25ms at 16kHz
+  hop_length: 160          # 10ms at 16kHz
+  n_mels: 80
+  n_mfcc: 40
+  f_min: 20
+  f_max: 7600
+  normalize: "cmvn"        # cmvn | instance | none
+  spec_augment:
+    enable: false
+    freq_mask_param: 10
+    time_mask_param: 5
+    num_freq_masks: 2
+    num_time_masks: 2
+
+augmentation:
+  enable: false
+  noise:
+    enable: false
+    snr_range: [5, 20]
+    noise_manifest: null
+  reverb:
+    enable: false
+    rir_manifest: null
+  speed_perturb:
+    enable: false
+    factors: [0.9, 1.0, 1.1]
+  volume_perturb:
+    enable: false
+    gain_range: [-6, 6]
+
+model:
+  name: "dummy"           # dummy | ecapa_tdnn | resnet34 | custom
+  embedding_dim: 192
+  # model-specific params loaded from model/*.yaml
+
+loss:
+  type: "aam"             # aam | proto | combined
+  # loss-specific params loaded from loss/*.yaml
+
+training:
+  mode: "normal"          # normal | curriculum
+  epochs: 100
+  batch_size: 64
+  optimizer:
+    name: "adam"           # adam | adamw | sgd
+    lr: 0.001
+    weight_decay: 0.0001
+    momentum: 0.9          # SGD only
+    betas: [0.9, 0.999]   # Adam/AdamW
+  lr_scheduler:
+    name: "cosine"         # warmup | cosine | cyclic | one_cycle | step
+    warmup_epochs: 5
+    min_lr: 0.000001
+    step_size: 30
+    gamma: 0.1
+    max_lr: 0.01          # cyclic / one_cycle
+  gradient:
+    clip_norm: 5.0
+    accumulation_steps: 1
+  mixed_precision: true
+  compile_model: false
+  distributed:
+    enable: false
+    backend: "nccl"
+
+evaluation:
+  interval: 1              # eval every N epochs
+  trial_list: null
+  metrics: ["eer", "mindcf"]
+  mindcf_p_target: 0.01
+  mindcf_c_fa: 1.0
+  mindcf_c_miss: 1.0
+
+checkpoint:
+  dir: "checkpoints"
+  save_every: 5
+  keep_top_k: 3
+  monitor: "eer"
+  mode: "min"
+  resume: null             # path to checkpoint
+
+logging:
+  dir: "logs"
+  tensorboard: true
+  wandb:
+    enable: false
+    project: "speaker-embedding"
+    entity: null
+  csv: true
+  log_every_n_steps: 50
+
+export:
+  format: "onnx"           # onnx | torchscript
+  output_dir: "exported_models"
+  opset_version: 17

@@ -1,0 +1,27 @@
+# Curriculum training configuration
+defaults:
+  - base
+  - model: ecapa_tdnn
+  - loss: combined
+  - _self_
+
+training:
+  mode: "curriculum"
+  epochs: 150
+  curriculum:
+    stages:
+      - name: "easy"
+        epochs: 50
+        segment_length: 4.0
+        augmentation_prob: 0.1
+        speakers_per_batch: 8
+      - name: "medium"
+        epochs: 50
+        segment_length: 3.0
+        augmentation_prob: 0.3
+        speakers_per_batch: 16
+      - name: "hard"
+        epochs: 50
+        segment_length: 2.0
+        augmentation_prob: 0.6
+        speakers_per_batch: 32

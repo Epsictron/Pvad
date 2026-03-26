@@ -1,0 +1,19 @@
+# Combined AAM-Softmax + Prototypical loss
+loss:
+  type: "combined"
+  alpha: 0.5                # total = alpha * aam + (1-alpha) * proto
+  alpha_schedule:
+    enable: false
+    start: 0.8
+    end: 0.3
+    warmup_epochs: 10
+  aam:
+    num_classes: ???
+    embedding_dim: ${model.embedding_dim}
+    margin: 0.2
+    scale: 30.0
+    easy_margin: false
+  proto:
+    distance: "cosine"
+    n_support: 1
+    temperature: 0.05
