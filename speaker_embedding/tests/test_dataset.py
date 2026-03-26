@@ -2,8 +2,9 @@
 
 import json
 
+import numpy as np
+import soundfile as sf
 import torch
-import torchaudio
 import pytest
 from omegaconf import OmegaConf
 
@@ -24,8 +25,8 @@ def _write_manifest(path, entries):
 
 def _make_wav(path, num_samples=16000, sample_rate=16000):
     """Create a mono WAV file with random noise."""
-    waveform = torch.randn(1, num_samples)
-    torchaudio.save(str(path), waveform, sample_rate)
+    data = np.random.randn(num_samples).astype(np.float32)
+    sf.write(str(path), data, sample_rate)
 
 
 # ---------------------------------------------------------------------------
