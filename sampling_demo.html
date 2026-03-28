@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PVAD – Interactive Sampling Demo</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #181c25;
+    --border: #2a2f3a;
+    --accent: #6c8cff;
+    --accent2: #ff6c8c;
+    --accent3: #5ce0a8;
+    --text: #e0e4ec;
+    --muted: #8890a0;
+    --speaker1: #6c8cff;
+    --speaker2: #ff6c8c;
+    --speaker3: #5ce0a8;
+    --silence: #2a2f3a;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height:100vh; }
+
+  header { padding: 28px 32px 18px; border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.5px; }
+  header h1 span { color: var(--accent); }
+  header p { color: var(--muted); font-size: 0.88rem; margin-top: 4px; }
+
+  .layout { display: flex; min-height: calc(100vh - 90px); }
+
+  /* Sidebar Controls */
+  .sidebar { width: 320px; min-width: 320px; border-right: 1px solid var(--border); padding: 24px; overflow-y: auto; }
+  .sidebar h2 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); margin-bottom: 16px; }
+  .control-group { margin-bottom: 22px; }
+  .control-group label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 6px; }
+  .control-group .value { float: right; color: var(--accent); font-weight: 600; font-size: 0.82rem; }
+  input[type=range] {
+    -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px;
+    background: var(--border); outline: none; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--accent); cursor: pointer;
+  }
+  select {
+    width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); font-size: 0.88rem; cursor: pointer;
+  }
+  button.primary {
+    width: 100%; padding: 12px; border: none; border-radius: 8px;
+    background: var(--accent); color: #fff; font-size: 0.92rem; font-weight: 600;
+    cursor: pointer; transition: background 0.2s;
+  }
+  button.primary:hover { background: #5a7aee; }
+  button.secondary {
+    width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px;
+    background: transparent; color: var(--muted); font-size: 0.82rem;
+    cursor: pointer; margin-top: 8px; transition: all 0.2s;
+  }
+  button.secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  .divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+  /* Main area */
+  .main { flex: 1; padding: 24px 32px; overflow-y: auto; }
+  .main h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 16px; }
+
+  /* Cards */
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .card h3 { font-size: 0.88rem; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.8px; }
+
+  /* Timeline / Session View */
+  .session-timeline { position: relative; width: 100%; height: 80px; background: var(--bg); border-radius: 8px; overflow: hidden; }
+  .timeline-track { position: absolute; left: 0; height: 22px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; font-weight: 600; color: #fff; transition: all 0.3s; cursor: pointer; }
+  .timeline-track:hover { filter: brightness(1.2); transform: scaleY(1.15); }
+  .timeline-axis { position: absolute; bottom: 0; left: 0; right: 0; height: 24px; display: flex; align-items: flex-end; padding: 0 4px; }
+  .timeline-axis span { font-size: 0.65rem; color: var(--muted); position: absolute; bottom: 2px; transform: translateX(-50%); }
+
+  /* Waveform */
+  canvas.waveform { width: 100%; height: 100px; border-radius: 8px; background: var(--bg); display: block; }
+  canvas.spectrogram { width: 100%; height: 80px; border-radius: 8px; background: var(--bg); display: block; margin-top: 8px; }
+
+  /* Speaker badges */
+  .speaker-badges { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .badge { padding: 4px 12px; border-radius: 20px; font-size: 0.76rem; font-weight: 600; color: #fff; }
+
+  /* Stats grid */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .stat-item { text-align: center; padding: 14px; background: var(--bg); border-radius: 8px; }
+  .stat-item .num { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+  .stat-item .label { font-size: 0.72rem; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* RTTM table */
+  .rttm-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; font-family: 'Courier New', monospace; }
+  .rttm-table th { text-align: left; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--border); font-weight: 500; }
+  .rttm-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); }
+  .rttm-table tr:hover td { background: rgba(108,140,255,0.05); }
+  .rttm-scroll { max-height: 200px; overflow-y: auto; }
+
+  /* Tooltip */
+  .tooltip {
+    position: fixed; background: #222; color: #fff; padding: 6px 10px; border-radius: 6px;
+    font-size: 0.75rem; pointer-events: none; z-index: 100; display: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+
+  /* Turn gap distribution */
+  canvas.histogram { width: 100%; height: 120px; display: block; border-radius: 8px; background: var(--bg); }
+
+  /* Playback bar */
+  .playback-bar {
+    position: absolute; top: 0; bottom: 24px; width: 2px; background: #fff;
+    z-index: 10; pointer-events: none; transition: left 0.05s linear;
+  }
+
+  /* Responsive */
+  @media (max-width: 860px) {
+    .layout { flex-direction: column; }
+    .sidebar { width: 100%; min-width: auto; border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span>PVAD</span> – Interactive Sampling Demo</h1>
+  <p>Multi-speaker session synthesis for speaker-independent Voice Activity Detection training</p>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <h2>Session Parameters</h2>
+
+    <div class="control-group">
+      <label>Number of Speakers <span class="value" id="numSpkVal">2</span></label>
+      <input type="range" id="numSpeakers" min="1" max="3" value="2" step="1">
+    </div>
+
+    <div class="control-group">
+      <label>Session Duration (s) <span class="value" id="sessDurVal">30</span></label>
+      <input type="range" id="sessionDuration" min="10" max="120" value="30" step="5">
+    </div>
+
+    <div class="divider"></div>
+    <h2>Turn Gap Distribution</h2>
+
+    <div class="control-group">
+      <label>Mean Gap (s) <span class="value" id="meanGapVal">0.60</span></label>
+      <input type="range" id="meanGap" min="0.1" max="2.0" value="0.6" step="0.05">
+    </div>
+
+    <div class="control-group">
+      <label>Gap Variance <span class="value" id="gapVarVal">0.10</span></label>
+      <input type="range" id="gapVariance" min="0.0" max="0.5" value="0.1" step="0.02">
+    </div>
+
+    <div class="control-group">
+      <label>Min Gap (s) <span class="value" id="minGapVal">0.20</span></label>
+      <input type="range" id="minGap" min="0.05" max="1.0" value="0.2" step="0.05">
+    </div>
+
+    <div class="control-group">
+      <label>Max Gap (s) <span class="value" id="maxGapVal">1.50</span></label>
+      <input type="range" id="maxGap" min="0.5" max="4.0" value="1.5" step="0.1">
+    </div>
+
+    <div class="divider"></div>
+    <h2>Utterance Sampling</h2>
+
+    <div class="control-group">
+      <label>Mean Utterance Duration (s) <span class="value" id="meanUttVal">2.50</span></label>
+      <input type="range" id="meanUttDur" min="0.5" max="6.0" value="2.5" step="0.25">
+    </div>
+
+    <div class="control-group">
+      <label>Utterance Variance <span class="value" id="uttVarVal">0.80</span></label>
+      <input type="range" id="uttVariance" min="0.1" max="2.0" value="0.8" step="0.1">
+    </div>
+
+    <div class="divider"></div>
+    <h2>Target Speaker</h2>
+
+    <div class="control-group">
+      <select id="targetSpeaker"></select>
+    </div>
+
+    <div class="divider"></div>
+
+    <button class="primary" id="btnGenerate">Generate Session</button>
+    <button class="secondary" id="btnPlayback">▶ Simulate Playback</button>
+  </aside>
+
+  <div class="main">
+    <!-- Stats -->
+    <div class="card">
+      <h3>Session Statistics</h3>
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-item"><div class="num" id="statTurns">0</div><div class="label">Total Turns</div></div>
+        <div class="stat-item"><div class="num" id="statSpeech">0s</div><div class="label">Speech Time</div></div>
+        <div class="stat-item"><div class="num" id="statSilence">0s</div><div class="label">Silence Time</div></div>
+        <div class="stat-item"><div class="num" id="statAvgGap">0s</div><div class="label">Avg Gap</div></div>
+        <div class="stat-item"><div class="num" id="statAvgUtt">0s</div><div class="label">Avg Utterance</div></div>
+        <div class="stat-item"><div class="num" id="statRatio">0%</div><div class="label">Speech Ratio</div></div>
+      </div>
+    </div>
+
+    <!-- Speakers -->
+    <div class="card">
+      <h3>Speakers in Session</h3>
+      <div class="speaker-badges" id="speakerBadges"></div>
+    </div>
+
+    <!-- Synthetic waveform -->
+    <div class="card">
+      <h3>Synthesized Waveform</h3>
+      <canvas class="waveform" id="waveformCanvas"></canvas>
+      <canvas class="spectrogram" id="spectrogramCanvas"></canvas>
+    </div>
+
+    <!-- Timeline -->
+    <div class="card">
+      <h3>Speaker Timeline (RTTM)</h3>
+      <div class="session-timeline" id="sessionTimeline">
+        <div class="playback-bar" id="playbackBar" style="display:none;"></div>
+      </div>
+    </div>
+
+    <!-- PVAD Target -->
+    <div class="card">
+      <h3>PVAD Target Label <span style="font-size:0.72rem; color:var(--accent); text-transform:none; letter-spacing:0;">(target speaker highlighted)</span></h3>
+      <div class="session-timeline" id="pvadTimeline" style="height:50px;"></div>
+    </div>
+
+    <!-- Turn gap histogram -->
+    <div class="card">
+      <h3>Turn Gap Distribution</h3>
+      <canvas class="histogram" id="histogramCanvas"></canvas>
+    </div>
+
+    <!-- RTTM Output -->
+    <div class="card">
+      <h3>RTTM Output</h3>
+      <div class="rttm-scroll">
+        <table class="rttm-table" id="rttmTable">
+          <thead><tr><th>Type</th><th>Session</th><th>Ch</th><th>Start</th><th>Duration</th><th>Speaker</th></tr></thead>
+          <tbody id="rttmBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PVAD Manifest -->
+    <div class="card">
+      <h3>PVAD Manifest Entry (JSON)</h3>
+      <pre id="pvadManifest" style="font-size:0.78rem; color:var(--accent3); white-space:pre-wrap; line-height:1.6;"></pre>
+    </div>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ─── State ───
+let session = { segments: [], gaps: [], duration: 0 };
+const COLORS = ['#6c8cff', '#ff6c8c', '#5ce0a8'];
+const NAMES = ['Speaker A', 'Speaker B', 'Speaker C'];
+
+// ─── Helpers ───
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function gaussRandom(mean, variance) {
+  // Box-Muller
+  const u1 = Math.random(), u2 = Math.random();
+  const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+  return mean + z * Math.sqrt(variance);
+}
+
+function sampleGap() {
+  const mean = parseFloat(el('meanGap').value);
+  const v = parseFloat(el('gapVariance').value);
+  const lo = parseFloat(el('minGap').value);
+  const hi = parseFloat(el('maxGap').value);
+  return clamp(gaussRandom(mean, v), lo, hi);
+}
+
+function sampleUtterance() {
+  const mean = parseFloat(el('meanUttDur').value);
+  const v = parseFloat(el('uttVariance').value);
+  return clamp(gaussRandom(mean, v), 0.3, mean * 3);
+}
+
+function el(id) { return document.getElementById(id); }
+function fmt(n, d=2) { return n.toFixed(d); }
+
+// ─── Controls ───
+const sliders = [
+  ['numSpeakers', 'numSpkVal', 0],
+  ['sessionDuration', 'sessDurVal', 0],
+  ['meanGap', 'meanGapVal', 2],
+  ['gapVariance', 'gapVarVal', 2],
+  ['minGap', 'minGapVal', 2],
+  ['maxGap', 'maxGapVal', 2],
+  ['meanUttDur', 'meanUttVal', 2],
+  ['uttVariance', 'uttVarVal', 2],
+];
+sliders.forEach(([sid, vid, dec]) => {
+  el(sid).addEventListener('input', () => {
+    el(vid).textContent = parseFloat(el(sid).value).toFixed(dec);
+  });
+});
+
+el('numSpeakers').addEventListener('input', updateTargetSelect);
+
+function updateTargetSelect() {
+  const n = parseInt(el('numSpeakers').value);
+  const sel = el('targetSpeaker');
+  sel.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = NAMES[i];
+    sel.appendChild(opt);
+  }
+}
+updateTargetSelect();
+
+// ─── Session Generation ───
+function generateSession() {
+  const numSpk = parseInt(el('numSpeakers').value);
+  const totalDur = parseFloat(el('sessionDuration').value);
+  const segments = [];
+  const gaps = [];
+  let t = 0;
+  let prevSpk = -1;
+
+  while (t < totalDur) {
+    // Gap
+    if (segments.length > 0) {
+      const g = sampleGap();
+      gaps.push({ start: t, duration: g });
+      t += g;
+      if (t >= totalDur) break;
+    }
+
+    // Pick speaker (avoid same twice in a row when possible)
+    let spk;
+    if (numSpk === 1) {
+      spk = 0;
+    } else {
+      do { spk = Math.floor(Math.random() * numSpk); } while (spk === prevSpk);
+    }
+    prevSpk = spk;
+
+    // Utterance
+    let dur = sampleUtterance();
+    if (t + dur > totalDur) dur = totalDur - t;
+    if (dur < 0.1) break;
+
+    segments.push({ speaker: spk, start: t, duration: dur });
+    t += dur;
+  }
+
+  session = { segments, gaps, duration: totalDur };
+  render();
+}
+
+// ─── Rendering ───
+function render() {
+  renderStats();
+  renderBadges();
+  renderTimeline();
+  renderPvadTimeline();
+  renderWaveform();
+  renderSpectrogram();
+  renderHistogram();
+  renderRttm();
+  renderManifest();
+}
+
+function renderStats() {
+  const { segments, gaps, duration } = session;
+  const speechTime = segments.reduce((s, seg) => s + seg.duration, 0);
+  const silenceTime = duration - speechTime;
+  const avgGap = gaps.length ? gaps.reduce((s, g) => s + g.duration, 0) / gaps.length : 0;
+  const avgUtt = segments.length ? speechTime / segments.length : 0;
+
+  el('statTurns').textContent = segments.length;
+  el('statSpeech').textContent = fmt(speechTime, 1) + 's';
+  el('statSilence').textContent = fmt(silenceTime, 1) + 's';
+  el('statAvgGap').textContent = fmt(avgGap) + 's';
+  el('statAvgUtt').textContent = fmt(avgUtt) + 's';
+  el('statRatio').textContent = fmt(duration > 0 ? (speechTime / duration) * 100, 0) + '%';
+}
+
+function renderBadges() {
+  const n = parseInt(el('numSpeakers').value);
+  const container = el('speakerBadges');
+  container.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const turns = session.segments.filter(s => s.speaker === i).length;
+    const time = session.segments.filter(s => s.speaker === i).reduce((a, s) => a + s.duration, 0);
+    const b = document.createElement('span');
+    b.className = 'badge';
+    b.style.background = COLORS[i];
+    b.textContent = `${NAMES[i]}  ·  ${turns} turns  ·  ${fmt(time,1)}s`;
+    container.appendChild(b);
+  }
+}
+
+function renderTimeline() {
+  const container = el('sessionTimeline');
+  // Clear old tracks but keep playback bar
+  container.querySelectorAll('.timeline-track, .timeline-axis').forEach(e => e.remove());
+  const { segments, duration } = session;
+  const numSpk = parseInt(el('numSpeakers').value);
+
+  segments.forEach((seg, i) => {
+    const div = document.createElement('div');
+    div.className = 'timeline-track';
+    div.style.left = (seg.start / duration * 100) + '%';
+    div.style.width = (seg.duration / duration * 100) + '%';
+    div.style.top = (6 + seg.speaker * 26) + 'px';
+    div.style.background = COLORS[seg.speaker];
+    div.textContent = fmt(seg.duration, 1) + 's';
+    div.dataset.idx = i;
+    div.addEventListener('mouseenter', showTooltip);
+    div.addEventListener('mouseleave', hideTooltip);
+    container.appendChild(div);
+  });
+
+  // Axis
+  const axis = document.createElement('div');
+  axis.className = 'timeline-axis';
+  const ticks = Math.min(10, Math.floor(duration / 2));
+  for (let i = 0; i <= ticks; i++) {
+    const sp = document.createElement('span');
+    const t = (i / ticks) * duration;
+    sp.textContent = fmt(t, 0) + 's';
+    sp.style.left = (i / ticks * 100) + '%';
+    axis.appendChild(sp);
+  }
+  container.appendChild(axis);
+}
+
+function renderPvadTimeline() {
+  const container = el('pvadTimeline');
+  container.innerHTML = '';
+  const { segments, duration } = session;
+  const targetSpk = parseInt(el('targetSpeaker').value);
+
+  segments.forEach(seg => {
+    const div = document.createElement('div');
+    div.className = 'timeline-track';
+    div.style.left = (seg.start / duration * 100) + '%';
+    div.style.width = (seg.duration / duration * 100) + '%';
+    div.style.top = '8px';
+    div.style.height = '28px';
+    if (seg.speaker === targetSpk) {
+      div.style.background = COLORS[targetSpk];
+    } else {
+      div.style.background = 'rgba(255,255,255,0.08)';
+    }
+    container.appendChild(div);
+  });
+
+  // Axis
+  const axis = document.createElement('div');
+  axis.className = 'timeline-axis';
+  axis.style.bottom = '0';
+  const ticks = Math.min(10, Math.floor(duration / 2));
+  for (let i = 0; i <= ticks; i++) {
+    const sp = document.createElement('span');
+    const t = (i / ticks) * duration;
+    sp.textContent = fmt(t, 0) + 's';
+    sp.style.left = (i / ticks * 100) + '%';
+    axis.appendChild(sp);
+  }
+  container.appendChild(axis);
+}
+
+function renderWaveform() {
+  const canvas = el('waveformCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.clientWidth * 2;
+  const H = canvas.clientHeight * 2;
+  canvas.width = W; canvas.height = H;
+  ctx.clearRect(0, 0, W, H);
+
+  const { segments, duration } = session;
+  if (!segments.length) return;
+
+  // Draw silence baseline
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.beginPath(); ctx.moveTo(0, H/2); ctx.lineTo(W, H/2); ctx.stroke();
+
+  // For each segment, generate a synthetic waveform
+  segments.forEach(seg => {
+    const x0 = (seg.start / duration) * W;
+    const x1 = ((seg.start + seg.duration) / duration) * W;
+    const color = COLORS[seg.speaker];
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.2;
+    ctx.globalAlpha = 0.8;
+    ctx.beginPath();
+
+    const freq = 3 + seg.speaker * 2; // Different "pitch" per speaker
+    const amFreq = 0.4 + seg.speaker * 0.15; // AM modulation rate
+    const samples = Math.max(Math.floor(x1 - x0), 10);
+
+    for (let i = 0; i < samples; i++) {
+      const frac = i / samples;
+      const t = frac * seg.duration;
+      // Envelope: fade in/out
+      const env = Math.sin(Math.PI * frac) * 0.9;
+      // Signal: sum of harmonics with AM
+      const am = 0.5 + 0.5 * Math.sin(2 * Math.PI * amFreq * t);
+      const sig = (Math.sin(2 * Math.PI * freq * t * 8) * 0.5 +
+                   Math.sin(2 * Math.PI * freq * t * 16) * 0.3 +
+                   Math.sin(2 * Math.PI * freq * t * 24) * 0.15 +
+                   (Math.random() - 0.5) * 0.15) * env * am;
+
+      const x = x0 + i;
+      const y = H / 2 - sig * H * 0.42;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Fill under the waveform lightly
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.04;
+    ctx.fillRect(x0, 0, x1 - x0, H);
+    ctx.globalAlpha = 1;
+  });
+}
+
+function renderSpectrogram() {
+  const canvas = el('spectrogramCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.clientWidth * 2;
+  const H = canvas.clientHeight * 2;
+  canvas.width = W; canvas.height = H;
+  ctx.clearRect(0, 0, W, H);
+
+  const { segments, duration } = session;
+  const freqBins = 40;
+
+  segments.forEach(seg => {
+    const x0 = Math.floor((seg.start / duration) * W);
+    const x1 = Math.floor(((seg.start + seg.duration) / duration) * W);
+    const color = COLORS[seg.speaker];
+
+    // Parse color to RGB
+    const r = parseInt(color.slice(1, 3), 16);
+    const g = parseInt(color.slice(3, 5), 16);
+    const b = parseInt(color.slice(5, 7), 16);
+
+    const baseFreq = 6 + seg.speaker * 4;
+
+    for (let x = x0; x < x1; x++) {
+      const frac = (x - x0) / (x1 - x0);
+      const env = Math.sin(Math.PI * frac);
+      for (let fi = 0; fi < freqBins; fi++) {
+        const fNorm = fi / freqBins;
+        // Energy concentrated around speaker's "formant"
+        const energy = Math.exp(-Math.pow(fNorm * 20 - baseFreq, 2) / 8) * env;
+        const noise = Math.random() * 0.15;
+        const val = clamp(energy + noise * energy, 0, 1);
+        ctx.fillStyle = `rgba(${r},${g},${b},${val * 0.8})`;
+        const binH = H / freqBins;
+        ctx.fillRect(x, H - (fi + 1) * binH, 1, binH);
+      }
+    }
+  });
+}
+
+function renderHistogram() {
+  const canvas = el('histogramCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.clientWidth * 2;
+  const H = canvas.clientHeight * 2;
+  canvas.width = W; canvas.height = H;
+  ctx.clearRect(0, 0, W, H);
+
+  const { gaps } = session;
+  if (gaps.length < 2) {
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.font = '24px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('Not enough gaps to plot', W/2, H/2);
+    return;
+  }
+
+  const binCount = 15;
+  const maxGapVal = Math.max(...gaps.map(g => g.duration));
+  const minGapVal = Math.min(...gaps.map(g => g.duration));
+  const range = maxGapVal - minGapVal || 0.5;
+  const binWidth = range / binCount;
+  const bins = new Array(binCount).fill(0);
+
+  gaps.forEach(g => {
+    const bi = Math.min(Math.floor((g.duration - minGapVal) / binWidth), binCount - 1);
+    bins[bi]++;
+  });
+
+  const maxBin = Math.max(...bins);
+  const pad = { l: 50, r: 20, t: 10, b: 30 };
+  const plotW = W - pad.l - pad.r;
+  const plotH = H - pad.t - pad.b;
+  const bw = plotW / binCount;
+
+  // Bars
+  bins.forEach((count, i) => {
+    const h = maxBin > 0 ? (count / maxBin) * plotH : 0;
+    const x = pad.l + i * bw;
+    const y = pad.t + plotH - h;
+    ctx.fillStyle = 'rgba(108,140,255,0.6)';
+    ctx.fillRect(x + 2, y, bw - 4, h);
+    ctx.fillStyle = 'rgba(108,140,255,0.2)';
+    ctx.fillRect(x + 2, y, bw - 4, h);
+  });
+
+  // X axis labels
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.font = '18px system-ui';
+  ctx.textAlign = 'center';
+  for (let i = 0; i <= binCount; i += 3) {
+    const v = minGapVal + i * binWidth;
+    ctx.fillText(fmt(v) + 's', pad.l + i * bw, H - 6);
+  }
+
+  // Y axis labels
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 3; i++) {
+    const v = Math.round((i / 3) * maxBin);
+    const y = pad.t + plotH - (i / 3) * plotH;
+    ctx.fillText(v, pad.l - 8, y + 5);
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+  }
+}
+
+function renderRttm() {
+  const tbody = el('rttmBody');
+  tbody.innerHTML = '';
+  session.segments.forEach(seg => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>SPEAKER</td><td>session_0</td><td>1</td><td>${fmt(seg.start, 3)}</td><td>${fmt(seg.duration, 3)}</td><td style="color:${COLORS[seg.speaker]}">${NAMES[seg.speaker].toLowerCase().replace(' ', '_')}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderManifest() {
+  const targetSpk = parseInt(el('targetSpeaker').value);
+  const numSpk = parseInt(el('numSpeakers').value);
+  const dur = parseFloat(el('sessionDuration').value);
+
+  const manifest = {
+    audio_filepath: "/data/simulated/librispeech/train_" + numSpk + "spk/session_0.wav",
+    duration: dur,
+    rttm_filepath: "/data/simulated/librispeech/train_" + numSpk + "spk/session_0.rttm",
+    target_speaker: NAMES[targetSpk].toLowerCase().replace(' ', '_'),
+    num_speakers: numSpk,
+    language: "en",
+    source_dataset: "librispeech"
+  };
+
+  el('pvadManifest').textContent = JSON.stringify(manifest, null, 2);
+}
+
+// ─── Tooltip ───
+function showTooltip(e) {
+  const idx = parseInt(e.target.dataset.idx);
+  const seg = session.segments[idx];
+  if (!seg) return;
+  const tip = el('tooltip');
+  tip.innerHTML = `<b style="color:${COLORS[seg.speaker]}">${NAMES[seg.speaker]}</b><br>Start: ${fmt(seg.start, 3)}s<br>Duration: ${fmt(seg.duration, 3)}s`;
+  tip.style.display = 'block';
+  tip.style.left = (e.clientX + 12) + 'px';
+  tip.style.top = (e.clientY - 10) + 'px';
+}
+function hideTooltip() { el('tooltip').style.display = 'none'; }
+document.addEventListener('mousemove', e => {
+  const tip = el('tooltip');
+  if (tip.style.display === 'block') {
+    tip.style.left = (e.clientX + 12) + 'px';
+    tip.style.top = (e.clientY - 10) + 'px';
+  }
+});
+
+// ─── Playback simulation ───
+let playbackAnim = null;
+function simulatePlayback() {
+  if (playbackAnim) { cancelAnimationFrame(playbackAnim); el('playbackBar').style.display = 'none'; playbackAnim = null; return; }
+  const bar = el('playbackBar');
+  bar.style.display = 'block';
+  const startTime = performance.now();
+  const dur = session.duration;
+  const speed = Math.max(dur / 6, 3); // playback in ~6 seconds
+
+  function tick(now) {
+    const elapsed = (now - startTime) / 1000;
+    const pct = (elapsed / speed) * 100;
+    if (pct >= 100) {
+      bar.style.display = 'none';
+      playbackAnim = null;
+      return;
+    }
+    bar.style.left = pct + '%';
+    playbackAnim = requestAnimationFrame(tick);
+  }
+  playbackAnim = requestAnimationFrame(tick);
+}
+
+// ─── Events ───
+el('btnGenerate').addEventListener('click', generateSession);
+el('btnPlayback').addEventListener('click', simulatePlayback);
+el('targetSpeaker').addEventListener('change', () => { renderPvadTimeline(); renderManifest(); });
+
+// ─── Resize handling ───
+window.addEventListener('resize', () => {
+  if (session.segments.length) {
+    renderWaveform();
+    renderSpectrogram();
+    renderHistogram();
+  }
+});
+
+// ─── Initial generation ───
+generateSession();
+</script>
+</body>
+</html>
