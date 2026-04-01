@@ -1,4 +1,5 @@
-# Copied from NeMo speaker_reco.py — no changes except config path.
+# Copied from NeMo speaker_reco.py.
+# Only addition: swap encoder after model init (NeMo blocks custom _target_).
 
 import os, sys
 from pathlib import Path
@@ -6,10 +7,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytorch_lightning as pl
 from pytorch_lightning import seed_everything
-from omegaconf import OmegaConf
 from nemo.collections.asr.models import EncDecSpeakerLabelModel
 from nemo.core.config import hydra_runner
 from nemo.utils.exp_manager import exp_manager
+
+from custom_model.encoder import CustomSpeakerEncoder
 
 seed_everything(42)
 
@@ -19,6 +21,12 @@ def main(cfg):
     trainer = pl.Trainer(**cfg.trainer)
     log_dir = exp_manager(trainer, cfg.get("exp_manager", None))
     speaker_model = EncDecSpeakerLabelModel(cfg=cfg.model, trainer=trainer)
+
+    # Swap encoder to custom model (NeMo _target_ only allows approved namespaces)
+    speaker_model.encoder = CustomSpeakerEncoder(
+        feat_in=cfg.model.preprocessor.features,
+        feat_out=cfg.model.decoder.feat_in,
+    )
 
     if log_dir is not None:
         with open(os.path.join(log_dir, 'labels.txt'), 'w') as f:
