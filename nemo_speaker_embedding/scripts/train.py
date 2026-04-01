@@ -1,17 +1,21 @@
 # Copied from NeMo speaker_reco.py.
 # Only addition: swap encoder after model init (NeMo blocks custom _target_).
 
-import os, sys
+import os, sys, importlib.util
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+# Load custom encoder via absolute path (Hydra changes cwd, so sys.path won't work)
+_encoder_path = Path(__file__).resolve().parent.parent / "custom_model" / "encoder.py"
+_spec = importlib.util.spec_from_file_location("custom_model.encoder", _encoder_path)
+_mod = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_mod)
+CustomSpeakerEncoder = _mod.CustomSpeakerEncoder
 
 import pytorch_lightning as pl
 from pytorch_lightning import seed_everything
 from nemo.collections.asr.models import EncDecSpeakerLabelModel
 from nemo.core.config import hydra_runner
 from nemo.utils.exp_manager import exp_manager
-
-from custom_model.encoder import CustomSpeakerEncoder
 
 seed_everything(42)
 
