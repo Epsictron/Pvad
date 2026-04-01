@@ -1,48 +1,40 @@
-# Custom Speaker Embedding Model — based on NeMo TitaNet-Large recipe
-# Adapted from: NVIDIA/NeMo/examples/speaker_tasks/recognition/conf/titanet-large.yaml
-#
-# Changes from original TitaNet-L:
-#   - encoder._target_ → custom_model.encoder.CustomSpeakerEncoder (custom backbone)
-#   - num_classes → 10 (placeholder — set to your speaker count)
-#   - batch_size reduced for single-GPU
-#   - To use NeMo's built-in encoder instead, swap encoder section
+# Copied from NeMo titanet-large.yaml — only encoder._target_ changed.
 
 name: &name "CustomSpeakerModel"
 sample_rate: &sample_rate 16000
 
 model:
-  sample_rate: *sample_rate
-
   train_ds:
-    manifest_filepath: ???   # SET THIS: path to train_manifest.json
-    sample_rate: *sample_rate
+    manifest_filepath: ???
+    sample_rate: 16000
     labels: null
-    batch_size: 32
-    shuffle: true
-    is_tarred: false
+    batch_size: 64
+    shuffle: True
+    is_tarred: False
     tarred_audio_filepaths: null
     tarred_shard_strategy: "scatter"
     augmentor:
       noise:
-        manifest_path: null  # SET THIS: path to noise manifest (optional)
+        manifest_path: null
         prob: 0.5
         min_snr_db: 0
         max_snr_db: 15
+
       speed:
         prob: 0.3
         sr: *sample_rate
-        resample_type: "kaiser_fast"
+        resample_type: 'kaiser_fast'
         min_speed_rate: 0.95
         max_speed_rate: 1.05
 
   validation_ds:
-    manifest_filepath: ???   # SET THIS: path to val_manifest.json
-    sample_rate: *sample_rate
+    manifest_filepath: ???
+    sample_rate: 16000
     labels: null
-    batch_size: 32
-    shuffle: false
+    batch_size: 128
+    shuffle: False
+    is_audio_pair: false
 
-  # ── Preprocessor: waveform → mel-spectrogram ──────────────────────
   preprocessor:
     _target_: nemo.collections.asr.modules.AudioToMelSpectrogramPreprocessor
     normalize: "per_feature"
@@ -55,7 +47,6 @@ model:
     frame_splicing: 1
     dither: 0.00001
 
-  # ── Spectrogram augmentation (SpecAugment) ────────────────────────
   spec_augment:
     _target_: nemo.collections.asr.modules.SpectrogramAugmentation
     freq_masks: 3
@@ -63,71 +54,51 @@ model:
     time_masks: 5
     time_width: 0.03
 
-  # ── Encoder: custom TDNN-SE backbone ──────────────────────────────
-  # To switch back to NeMo's built-in TitaNet encoder, replace with:
-  #   _target_: nemo.collections.asr.modules.ConvASREncoder
-  #   feat_in: *n_mels
-  #   activation: relu
-  #   conv_mask: true
-  #   jasper: [...]  (see titanet-large.yaml)
+  # ── ONLY CHANGE: custom encoder instead of ConvASREncoder ──
   encoder:
     _target_: custom_model.encoder.CustomSpeakerEncoder
     feat_in: *n_mels
-    feat_out: &enc_feat_out 1536
+    feat_out: &enc_feat_out 3072
 
-  # ── Decoder: pooling → embedding → classification ─────────────────
   decoder:
     _target_: nemo.collections.asr.modules.SpeakerDecoder
     feat_in: *enc_feat_out
-    num_classes: 10         # SET THIS: number of speakers in your training data
-    pool_mode: "attention"  # "attention", "xvector" (stats pooling), "tap" (mean)
-    emb_sizes: 192          # speaker embedding dimension
+    num_classes: 7205
+    pool_mode: 'attention'
+    emb_sizes: 192
 
-  # ── Loss: Additive Angular Margin Softmax ─────────────────────────
-  # This is critical for learning discriminative speaker embeddings.
-  # - scale: temperature scaling (higher = sharper logits)
-  # - margin: angular margin penalty (larger = harder to classify = better embeddings)
   loss:
     _target_: nemo.collections.asr.losses.angularloss.AngularSoftmaxLoss
     scale: 30
     margin: 0.2
 
-  # ── Optimizer ─────────────────────────────────────────────────────
   optim:
     name: sgd
-    lr: 0.001
+    lr: .006
     weight_decay: 0.0002
     momentum: 0.9
+
     sched:
       name: CosineAnnealing
       warmup_ratio: 0.1
       min_lr: 0.0
 
-# ── Trainer ─────────────────────────────────────────────────────────
 trainer:
   devices: 1
-  max_epochs: 100
+  max_epochs: 250
   max_steps: -1
   num_nodes: 1
-  accelerator: "auto"
-  strategy: "auto"
-  deterministic: true
-  enable_checkpointing: false
-  logger: false
-  log_every_n_steps: 10
+  accelerator: gpu
+  strategy: ddp
+  deterministic: True
+  enable_checkpointing: False
+  logger: False
+  log_every_n_steps: 1
   val_check_interval: 1.0
   gradient_clip_val: 1.0
 
-# ── Experiment Manager ──────────────────────────────────────────────
 exp_manager:
-  exp_dir: ./experiments
+  exp_dir: null
   name: *name
-  create_tensorboard_logger: true
-  create_checkpoint_callback: true
-  checkpoint_callback_params:
-    monitor: "val_loss"
-    mode: "min"
-    save_top_k: 3
-    always_save_nemo: true
-  resume_if_exists: true
-  resume_ignore_no_checkpoint: true
+  create_tensorboard_logger: True
+  create_checkpoint_callback: True

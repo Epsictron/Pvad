@@ -1,12 +1,12 @@
-"""Train — thin wrapper around NeMo's speaker_reco.py recipe."""
+# Copied from NeMo speaker_reco.py — no changes except config path.
 
-import sys
+import os, sys
 from pathlib import Path
-from pytorch_lightning import seed_everything
-
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytorch_lightning as pl
+from pytorch_lightning import seed_everything
+from omegaconf import OmegaConf
 from nemo.collections.asr.models import EncDecSpeakerLabelModel
 from nemo.core.config import hydra_runner
 from nemo.utils.exp_manager import exp_manager
@@ -17,11 +17,20 @@ seed_everything(42)
 @hydra_runner(config_path="../conf", config_name="speaker_model")
 def main(cfg):
     trainer = pl.Trainer(**cfg.trainer)
-    exp_manager(trainer, cfg.get("exp_manager", None))
-    model = EncDecSpeakerLabelModel(cfg=cfg.model, trainer=trainer)
-    trainer.fit(model)
-    model.save_to("speaker_model.nemo")
+    log_dir = exp_manager(trainer, cfg.get("exp_manager", None))
+    speaker_model = EncDecSpeakerLabelModel(cfg=cfg.model, trainer=trainer)
+
+    if log_dir is not None:
+        with open(os.path.join(log_dir, 'labels.txt'), 'w') as f:
+            if speaker_model.labels is not None:
+                for label in speaker_model.labels:
+                    f.write(f'{label}\n')
+
+    trainer.fit(speaker_model)
+
+    if not trainer.fast_dev_run:
+        speaker_model.save_to(os.path.join(log_dir, '..', 'spkr.nemo'))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
